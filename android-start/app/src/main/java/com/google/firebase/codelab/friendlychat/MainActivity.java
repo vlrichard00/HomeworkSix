@@ -63,6 +63,11 @@ import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
+@Override
+public void onConnectionFailed(ConnectionResult connectionResult) {
+        Log.d(TAG, "onConnectionFailed:" + connectionResult);
+        }
+
 public class MainActivity extends AppCompatActivity
         implements GoogleApiClient.OnConnectionFailedListener {
 
@@ -95,6 +100,10 @@ public class MainActivity extends AppCompatActivity
     private DatabaseReference mFirebaseDatabaseReference;
     private FirebaseRecyclerAdapter<FriendlyMessage, MessageViewHolder>
             mFirebaseAdapter;
+    private FirebaseRemoteConfig mFirebaseRemoteConfi
+
+
+
 
 
 
@@ -110,6 +119,7 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        private GoogleApiClient mGoogleApiClient;
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         // Set default username is anonymous.
         mUsername = ANONYMOUS;
@@ -139,7 +149,26 @@ public class MainActivity extends AppCompatActivity
         mLinearLayoutManager = new LinearLayoutManager(this);
         mLinearLayoutManager.setStackFromEnd(true);
         mMessageRecyclerView.setLayoutManager(mLinearLayoutManager);
+// Initialize Firebase Remote Config.
+        mFirebaseRemoteConfig = FirebaseRemoteConfig.getInstance();
 
+// Define Firebase Remote Config Settings.
+        FirebaseRemoteConfigSettings firebaseRemoteConfigSettings =
+                new FirebaseRemoteConfigSettings.Builder()
+                        .setDeveloperModeEnabled(true)
+                        .build();
+
+// Define default config values. Defaults are used when fetched config values are not
+// available. Eg: if an error occurred fetching values from the server.
+        Map<String, Object> defaultConfigMap = new HashMap<>();
+        defaultConfigMap.put("friendly_msg_length", 10L);
+
+// Apply config settings and default values.
+        mFirebaseRemoteConfig.setConfigSettings(firebaseRemoteConfigSettings);
+        mFirebaseRemoteConfig.setDefaults(defaultConfigMap);
+
+// Fetch remote config.
+        fetchConfig();
         // New child entries
         mFirebaseDatabaseReference = FirebaseDatabase.getInstance().getReference();
         mFirebaseAdapter = new FirebaseRecyclerAdapter<FriendlyMessage,
@@ -283,5 +312,118 @@ public class MainActivity extends AppCompatActivity
         Log.d(TAG, "onConnectionFailed:" + connectionResult);
         Toast.makeText(this, "Google Play Services error.", Toast.LENGTH_SHORT).show();
     }
+        // Fetch the config to determine the allowed length of messages.
+        public void fetchConfig() {
+            long cacheExpiration = 3600; // 1 hour in seconds
+            // If developer mode is enabled reduce cacheExpiration to 0 so that
+            // each fetch goes to the server. This should not be used in release
+            // builds.
+            if (mFirebaseRemoteConfig.getInfo().getConfigSettings()
+                    .isDeveloperModeEnabled()) {
+                cacheExpiration = 0;
+            }
+            mFirebaseRemoteConfig.fetch(cacheExpiration)
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            // Make the fetched config available via
+                            // FirebaseRemoteConfig get<type> calls.
+                            mFirebaseRemoteConfig.activateFetched();
+                            applyRetrievedLengthLimit();
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            // There has been an error fetching the config
+                            Log.w(TAG, "Error fetching config: " +
+                                    e.getMessage());
+                            applyRetrievedLengthLimit();
+                        }
+                    });
+
+
+
+/**
+ * Apply retrieved length limit to edit text field.
+ * This result may be fresh from the server or it may be from cached
+ * values.
+ */
+        private void applyRetrievedLengthLimit() {
+            Long friendly_msg_length =
+                    mFirebaseRemoteConfig.getLong("friendly_msg_length");
+            mMessageEditText.setFilters(new InputFilter[]{new
+                    InputFilter.LengthFilter(friendly_msg_length.intValue())});
+            Log.d(TAG, "FML is: " + friendly_msg_length);
+        }
+
+        Override
+        public boolean onOptionsItemSelected(MenuItem item) {
+            switch (item.getItemId()) {
+                case R.id.fresh_config_menu:
+                    fetchConfig();
+                    return true;
+                case R.id.sign_out_menu:
+                    mFirebaseAuth.signOut();
+                    mUsername = ANONYMOUS;
+                    startActivity(new Intent(this, SignInActivity.class));
+                    return true;
+                default:
+                    return super.onOptionsItemSelected(item);
+            }
+
+    mGoogleApiClient = new GoogleApiClient.Builder(this)
+            .enableAutoManage(this, this)
+    .addApi(Auth.GOOGLE_SIGN_IN_API)
+    .addApi(AppInvite.API)
+    .build();
+
+            private void sendInvitation() {
+                Intent intent = new AppInviteInvitation.IntentBuilder(getString(R.string.invitation_title))
+                        .setMessage(getString(R.string.invitation_message))
+                        .setCallToActionText(getString(R.string.invitation_cta))
+                        .build();
+                startActivityForResult(intent, REQUEST_INVITE);
+            }
+
+            @Override
+            protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                super.onActivityResult(requestCode, resultCode, data);
+                Log.d(TAG, "onActivityResult: requestCode=" + requestCode +
+                        ", resultCode=" + resultCode);
+
+                if (requestCode == REQUEST_INVITE) {
+                    if (resultCode == RESULT_OK) {
+                        // Check how many invitations were sent.
+                        String[] ids = AppInviteInvitation
+                                .getInvitationIds(resultCode, data);
+                        Log.d(TAG, "Invitations sent: " + ids.length);
+                    } else {
+                        // Sending failed or it was canceled, show failure message to
+                        // the user
+                        Log.d(TAG, "Failed to send invitation.");
+                    }
+                }
+            }
+
+            @Override
+            public boolean onOptionsItemSelected(MenuItem item) {
+                switch (item.getItemId()) {
+                    case R.id.invite_menu:
+                        sendInvitation();
+                        return true;
+                    case R.id.fresh_config_menu:
+                        fetchConfig();
+                        return true;
+                    case R.id.sign_out_menu:
+                        mFirebaseAuth.signOut();
+                        mUsername = ANONYMOUS;
+                        startActivity(new Intent(this, SignInActivity.class));
+                        return true;
+                    default:
+                        return super.onOptionsItemSelected(item);
+                }
+            }
+
 
 }
