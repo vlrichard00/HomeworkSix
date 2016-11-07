@@ -100,7 +100,9 @@ public class MainActivity extends AppCompatActivity
     private DatabaseReference mFirebaseDatabaseReference;
     private FirebaseRecyclerAdapter<FriendlyMessage, MessageViewHolder>
             mFirebaseAdapter;
-    private FirebaseRemoteConfig mFirebaseRemoteConfi
+    private FirebaseRemoteConfig mFirebaseRemoteConfig;
+    private AdView mAdView;
+
 
 
 
@@ -112,6 +114,9 @@ public class MainActivity extends AppCompatActivity
     private LinearLayoutManager mLinearLayoutManager;
     private ProgressBar mProgressBar;
     private EditText mMessageEditText;
+    private FirebaseAnalytics mFirebaseAnalytics;
+
+
 
     // Firebase instance variables
 
@@ -120,11 +125,15 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         private GoogleApiClient mGoogleApiClient;
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         // Set default username is anonymous.
         mUsername = ANONYMOUS;
         // Initialize Firebase Auth
         mFirebaseAuth = FirebaseAuth.getInstance();
+        mAdView = (AdView) findViewById(R.id.adView);
+        AdRequest adRequest = new AdRequest.Builder().build();
+        mAdView.loadAd(adRequest);
         mFirebaseUser = mFirebaseAuth.getCurrentUser();
         if (mFirebaseUser == null) {
             // Not signed in, launch the Sign In activity
@@ -357,21 +366,27 @@ public class MainActivity extends AppCompatActivity
             Log.d(TAG, "FML is: " + friendly_msg_length);
         }
 
-        Override
-        public boolean onOptionsItemSelected(MenuItem item) {
-            switch (item.getItemId()) {
-                case R.id.fresh_config_menu:
-                    fetchConfig();
-                    return true;
-                case R.id.sign_out_menu:
-                    mFirebaseAuth.signOut();
-                    mUsername = ANONYMOUS;
-                    startActivity(new Intent(this, SignInActivity.class));
-                    return true;
-                default:
-                    return super.onOptionsItemSelected(item);
-            }
-
+    Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.crash_menu:
+                FirebaseCrash.logcat(Log.ERROR, TAG, "crash caused");
+                causeCrash();
+                return true;
+            case R.id.invite_menu:
+                sendInvitation();
+                return true;
+            case R.id.fresh_config_menu:
+                fetchConfig();
+                return true;
+            case R.id.sign_out_menu:
+                mFirebaseAuth.signOut();
+                mUsername = ANONYMOUS;
+                startActivity(new Intent(this, SignInActivity.class));
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     mGoogleApiClient = new GoogleApiClient.Builder(this)
             .enableAutoManage(this, this)
     .addApi(Auth.GOOGLE_SIGN_IN_API)
@@ -404,6 +419,32 @@ public class MainActivity extends AppCompatActivity
                         Log.d(TAG, "Failed to send invitation.");
                     }
                 }
+                @Override
+                protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                    super.onActivityResult(requestCode, resultCode, data);
+                    Log.d(TAG, "onActivityResult: requestCode=" + requestCode + ", resultCode=" + resultCode);
+
+                    if (requestCode == REQUEST_INVITE) {
+                        if (resultCode == RESULT_OK) {
+                            Bundle payload = new Bundle();
+                            payload.putString(FirebaseAnalytics.Param.VALUE, "sent");
+                            mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SHARE,
+                                    payload);
+                            // Check how many invitations were sent and log.
+                            String[] ids = AppInviteInvitation.getInvitationIds(resultCode,
+                                    data);
+                            Log.d(TAG, "Invitations sent: " + ids.length);
+                        } else {
+                            Bundle payload = new Bundle();
+                            payload.putString(FirebaseAnalytics.Param.VALUE, "not sent");
+                            mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SHARE,
+                                    payload);
+                            // Sending failed or it was canceled, show failure message to
+                            // the user
+                            Log.d(TAG, "Failed to send invitation.");
+                        }
+                    }
+                }
             }
 
             @Override
@@ -423,7 +464,34 @@ public class MainActivity extends AppCompatActivity
                     default:
                         return super.onOptionsItemSelected(item);
                 }
-            }
+                @Override
+                public void onPause () {
+                    if (mAdView != null) {
+                        mAdView.pause();
+                    }
+                    super.onPause();
+                }
 
+/** Called when returning to the activity */
+                @Override
+                public void onResume () {
+                    super.onResume();
+                    if (mAdView != null) {
+                        mAdView.resume();
+                    }
+                }
 
+/** Called before the activity is destroyed */
+                @Override
+                public void onDestroy () {
+                    if (mAdView != null) {
+                        mAdView.destroy();
+                    }
+                    super.onDestroy();
+                }
+
+    private void causeCrash() {
+        throw new NullPointerException("Fake null pointer exception");
+    }
+}
 }
