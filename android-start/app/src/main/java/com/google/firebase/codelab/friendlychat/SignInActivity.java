@@ -44,6 +44,8 @@ public class SignInActivity extends AppCompatActivity implements
     private static final int RC_SIGN_IN = 9001;
 
     private SignInButton mSignInButton;
+    // Firebase instance variables
+    private FirebaseAuth mFirebaseAuth;
 
     private GoogleApiClient mGoogleApiClient;
 
